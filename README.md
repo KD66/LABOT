@@ -13,7 +13,7 @@ Exit code: 0 ok, 2 no feasible plan, 3 feasible but runs/day does not fit in `ho
 ## Deck model (`labot/deck.py`)
 | ids | what |
 |---|---|
-| `M1–M3` front, `M4–M6` back | 6 main SBS slots (3×2) |
+| `M1–M3` front, `M4–M6` back | 6 main SBS slots (3×2) - OUTDATED naming, customer names are A1–A3 / B1–B3, see docs/deck_design.md |
 | `F1–F3`, `B1–B3` | 3 narrow single-row slots in front / back |
 | two-slot item | 96 Eppendorf rack = 2 neighbouring main slots (`deck.two_slot_orientation`: horizontal/vertical/any) |
 
@@ -61,4 +61,6 @@ reuse, tip/well overfill, aspiration below dead volume or mixing dry wells.
 * timing constants (`DEFAULT_TIMING`), 5 µL excess for multi-dispense, 95 % tip fill
 * 384 plates and narrow tube rows are single-channel only; 96-head needs a 1-well reservoir for reagents
 * tip waste is off-deck; a partly used tip column is discarded
-* no replicates, cherry-picking or pooling yet; no liquid-class / height parameters
+* replicates, cherry-picking and pooling are NOT hardware limits (single tip on the end channel, or a channel mask) - they are simply not implemented in the planner yet; planned as a `pick_list` step
+* 384 plates: a 9 mm head reaches every 2nd row (4 interleaved passes), a 4.5 mm head a full column - the planner's "384 = single channel" rule is a placeholder
+* deck geometry in this README/catalog predates the customer's drawing: SBS is portrait, rows A/B + narrow rows C and 1-3, side positions L/R (see docs/)

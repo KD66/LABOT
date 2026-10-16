@@ -1,6 +1,30 @@
 # LABOT – rozvaha: rozložení plasticware, znovupoužití špiček, zadání
 
-Půdorys: `docs/deck_floorplan.png|svg` (geometrie je předpoklad). Tabulka k vyplnění: `docs/labot_zadani_parametry.xlsx`.
+Půdorys: `docs/deck_floorplan.png|svg`. Tabulka k vyplnění: `docs/labot_zadani_parametry.xlsx`.
+
+## 0. Geometrie decku (aktualizováno podle výkresu kotev a tabulky zákazníka)
+* SBS destičky stojí **na výšku**: 85,5 mm ve směru X, 127,8 mm ve směru Y. Sloupec 96w destičky (A–H, 8 × 9 mm) tak leží podél X
+  – přesně tam, kde je řada kanálů hlavy.
+* Hlavní sloty: **A1–A3** (přední řada), **B1–B3** (zadní řada); 3 šrouby do trojúhelníku na slot.
+* Úzké řady (≤ 2 řady hloubky, ≈ 27 mm): **1–3** vpředu (tabulka zákazníka), **C1–C3** vzadu (v tabulce chybí); 3 šrouby v řadě.
+  Řada 1×8 zkumavek podél X je dosažitelná **všemi 8 kanály najednou** (např. „8 F-PRIMERS“ = každý kanál jiný primer).
+* Boční pozice **L/R** (3 šrouby v řadě podél Y, ≈ 64 × 256 mm): vakutejnery, 15/50 mL, Eppendorf; dosáhne je jen **krajní kanál**
+  (levý/pravý). Z toho plyne osa kanálů podél X.
+* Rack 96 Eppendorf = dva holdery A1+B1 – dvouslotová dvojice je **svislá**.
+* Dvě konfigurace podle pipety: 12,5 µL (A3/B3 = plate, chlazení/magnet) a 300 µL (A3/B3 = zásobníky).
+* Neověřeno: která strana je přední, poloha slotu vůči kotvám, měřítko (odvozeno z rozteče slotů).
+
+## Cherry-picking, pooling, repliky
+Fyzicky nejsou omezené: špička se nasadí jen na krajní kanál (levý/pravý) nebo na masku kanálů a přenos jde z libovolné jamky do libovolné.
+Dřívější „bez cherry-pickingu“ byla mezera v plánovači, ne limit robota. Plán: krok `pick_list` (seznam zdroj→cíl, objem), plánovač seskupí
+přenosy do vícekanálových pohybů tam, kde jamky sedí na rozteči 9 mm, zbytek jede 1 kanálem (krajní kanál volí podle blízkosti
+bočních pozic). Pooling = N zdrojů → 1 jamka (nová špička na zdroj při kontaktu s kapalinou), repliky = 1 zdroj → N cílů.
+384 destičky: 9 mm hlava dosáhne každý 2. řádek (4 prokládané průchody), 4,5 mm hlava celý sloupec.
+
+## Hodnocení rozložení zákazníka (12,5 µL)
+* Vzorky (A1+B1) – špičky pro vzorky (A2) – plate (A3/B3): tok vlevo→doprava s tipy uprostřed, nejkratší dráha hlavy. Dobré.
+* R-primery (B3) sousedí se špičkami R-primerů (B2); F-primery a MM v řadě 2 vpředu, těsně u A3. Dobré.
+* Při znovupoužití špiček pro MM/pufry stačí 1 rack → B2 se může uvolnit pro druhou destičku/modul; C1–C3 jsou volné pro reagencie.
 
 ## 1. Co optimalizujeme
 Rozhodovací proměnné: (a) slot každého plasticware, (b) pořadí kroků, (c) politika špičky na krok,

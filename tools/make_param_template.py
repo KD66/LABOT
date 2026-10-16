@@ -55,13 +55,15 @@ for line in [
     "",
     "Listy:",
     "1_Robot      – hlava, pipety, pohyby, režimy dávkování, špičky",
-    "2_Deck       – sloty (3×2 SBS + 3 přední + 3 zadní úzké, předsazená řada), rozměry a omezení",
+    "2_Deck       – sloty A1–B3 (SBS na výšku), C1–C3 a 1–3 (úzké), L/R (boční), rozměry a omezení",
     "3_Plasticware – použité nádoby/destičky/racky/špičky",
     "4_Kapaliny   – každá kapalina: chování, riziko kontaminace, povolené znovupoužití špičky",
     "5_Kroky      – jeden řádek = jeden pipetovací krok (z–do, objem, režim, špička, dispense)",
     "6_Kvalita    – definice přesnosti a správnosti (třídy A/B/C) a způsob ověření",
     "7_Run        – počty vzorků a runů, směny, priority optimalizace",
     "8_Pipety     – seznam ClipTip pipet (ze zaslané tabulky) – zaškrtněte, které robot reálně má",
+    "9_Konfigurace – obsah slotů pro 12,5 µL a 300 µL pipetu (předvyplněno z vaší tabulky)",
+    "10_Pick_list – cherry-picking / pooling / repliky jako seznam přenosů",
     "",
     "Pojmy: správnost (trueness) = systematická odchylka od nominálního objemu v % nebo µL;",
     "přesnost (precision) = náhodná odchylka, CV v %. Vyplňte pro každou třídu kroku (list 6).",
@@ -74,8 +76,11 @@ ws["A1"].font = Font(bold=True, size=14)
 robot = [
     ("Pipetovací hlava – typ", "", "1 kanál / 8 / 12 / 16 / Equalizer (nastavitelná rozteč) / jiné", "volí počet jednotek na pohyb a dosah do úzkých slotů", ""),
     ("Počet pipet/hlav současně na gantry", "", "1 / 2 / výměna nástroje", "určuje, zda lze střídat rozsahy bez zásahu", "1"),
-    ("Osa řady kanálů vůči decku", "", "podél X (zleva doprava) / podél Y (zepředu dozadu)", "KLÍČOVÉ: úzký slot max. 2 řady – 8 kanálů se tam vejde jen při ose podél X", ""),
-    ("Rozteč kanálů (min / max)", "", "mm (9 / 4,5 / 9–19,8 …)", "zarovnání na 96/384 formát", "9"),
+    ("Osa řady kanálů vůči decku", "podél X (zleva doprava) – odvozeno z boční pozice 'levý/pravý kanál' a SBS na výšku", "podél X / podél Y", "potvrdit; sloupec 96w destičky (A–H) leží podél X, 8 kanálů se vejde do úzké řady 1×8 zkumavek", "podél X"),
+    ("Boční pozice L/R – které kanály dosáhnou", "jen krajní kanál (levý pro L, pravý pro R)", "kanál č. / všechny", "cherry-picking a odběr z vakutejnerů, 15/50 mL, Eppendorf", "krajní"),
+    ("Jednotlivé kanály: lze nasadit špičku jen na vybrané kanály (maska)?", "", "ano / ne / jen krajní", "cherry-picking, pooling, částečné sloupce", "ano"),
+    ("Výměna pipety mezi konfiguracemi (12,5 µL ⇄ 300 µL)", "", "ruční / automatická / hlava výměnná", "počet zásahů obsluhy za run; kdy se mění konfigurace A3/B3", "ruční"),
+    ("Rozteč kanálů (min / max)", "", "mm (9 / 4,5 / 9–19,8 …)", "9 mm hlava na 384 destičce = každý 2. řádek, 4 průchody; 4,5 mm hlava = celý sloupec", "9"),
     ("Rozsah pipety / pipet (viz list 8)", "", "µL min–max", "horní mez = max. nasátý objem na špičku (ne jmenovitý objem špičky)", ""),
     ("Pracovní okno přesnosti", "", "např. ≥ 10 % max. objemu pipety", "pod tím se krok nesmí dělat touto pipetou", "≥10 % max."),
     ("Dispense režimy podporované hlavou", "", "forward / reverse / multi-dispense (repeat) / blow-out / mix / touch-off / air-gap / pre-wet", "řídí, co smí plánovač použít", "forward, reverse, multi, mix"),
@@ -90,7 +95,7 @@ robot = [
     ("Průtoky nasátí / dávkování (min–max)", "", "µL/s", "model času, vazkost", "100"),
     ("Maximální výška labware na decku", "", "mm", "kolize hlavy", ""),
     ("Moduly na decku (třepačka, ohřev, chlazení, magnet)", "", "seznam + sloty", "zabírají sloty", "žádné"),
-    ("Vzorkové racky 96× Eppendorf – zabírají 2 sloty", "2 sousední hlavní sloty, vodorovně?", "vodorovně / svisle", "povolená poloha", "vodorovně"),
+    ("Vzorkové racky 96× Eppendorf – zabírají 2 sloty", "A1+B1 (svisle) – dle tabulky zákazníka", "svisle (A+B) / vodorovně", "povolená poloha dvojslotové položky", "svisle"),
     ("Typ špiček (ClipTip) a balení", "", "12,5 / 200 / 300 / 1250 / 1000 / 384×; rack 96 nebo 384", "kapacita racků na decku", ""),
 ]
 sheet("1_Robot", ["Parametr", "Hodnota", "Možnosti / jednotka", "K čemu to plánovač potřebuje", "Výchozí"],
@@ -98,14 +103,22 @@ sheet("1_Robot", ["Parametr", "Hodnota", "Možnosti / jednotka", "K čemu to pl�
 
 # ---------------------------------------------------------------- 2 Deck
 deck_rows = []
-for i in range(6):
-    deck_rows.append((f"M{i + 1}", "hlavní SBS", "přední řada" if i < 3 else "zadní řada", 127.76, 85.48, "", "", "ano", "", ""))
-for pre, where in (("F", "přední úzká (předsazená)"), ("B", "zadní úzká")):
+for r, where in (("A", "přední hlavní řada"), ("B", "zadní hlavní řada")):
     for i in range(3):
-        deck_rows.append((f"{pre}{i + 1}", "úzký", where, 127.76, "", "", "", "", "", "max. 2 řady"))
-deck_rows.append(("(?)", "předsazená řada – upřesnit", "", "", "", "", "", "", "", "popište/načrtněte: kolik pozic, o kolik mm je předsazena, v jakém rozsahu dosáhne hlava"))
-sheet("2_Deck", ["Slot", "Typ", "Poloha", "Šířka X mm", "Hloubka Y mm", "Střed X mm (od počátku robota)", "Střed Y mm", "Dosah všemi kanály?", "Max. výška labware mm", "Poznámka"],
-      deck_rows, [8, 24, 26, 12, 12, 20, 14, 18, 18, 55], fill_cols=(5, 6, 7, 8, 9), assume_cols=(1, 2, 3, 4, 10))
+        deck_rows.append((f"{r}{i + 1}", "hlavní SBS (na výšku)", where, 85.48, 127.76, "", "", "3 šrouby do trojúhelníku", "všech 8 kanálů", ""))
+for i in range(3):
+    deck_rows.append((f"C{i + 1}", "úzký (max. 2 řady)", "zadní úzká řada – v tabulce zákazníka chybí", 85.5, "≈27–30", "", "", "3 šrouby v řadě (rozteč 128 mm), společné pro C1–C3", "", "doplnit využití"))
+for i in range(3):
+    deck_rows.append((f"{i + 1}", "úzký (max. 2 řady)", "přední úzká řada", 85.5, "≈27", "", "", "3 šrouby v řadě (rozteč 128 mm), společné pro 1–3", "8 kanálů u řady 1×8 podél X", "tabulka: WASTE / 8 F-PRIMERS + MM / pufr"))
+for sid, where in (("L", "levý okraj"), ("R", "pravý okraj")):
+    deck_rows.append((sid, "boční pozice", where, "≈64", "≈256 (3 šrouby, rozteč 128 mm)", "", "", "3 šrouby v řadě podél Y", "jen krajní kanál", "vakutejnery, 15/50 mL, Eppendorf"))
+sheet("2_Deck", ["Slot", "Typ", "Poloha", "Šířka X mm", "Hloubka Y mm", "Střed X mm (od středu decku)", "Střed Y mm", "Kotvení", "Dosah kanály", "Poznámka"],
+      deck_rows, [8, 24, 36, 12, 18, 20, 14, 38, 24, 44], fill_cols=(6, 7), assume_cols=(1, 2, 3, 4, 8, 9, 10))
+ws2 = wb["2_Deck"]
+ws2.append([None])
+for line in ["Rozměry odvozeny z výkresu kotev (měřítko 0,455 mm/px při předpokladu, že hlavní sloty jsou SBS a těsně vedle sebe) – potvrdit skutečné rozměry plechu.",
+             "Potvrdit: (1) která strana je přední (obsluha), (2) poloha slotu vůči trojúhelníku kotev, (3) do jakého rozsahu dosáhne hlava přes okraje (osa X/Y min–max)."]:
+    ws2.append([line])
 
 # ---------------------------------------------------------------- 3 Plasticware
 lw = [
@@ -137,7 +150,7 @@ sheet("5_Kroky", ["#", "Název kroku", "Zdroj (kapalina/labware)", "Cíl (labwar
                   "Kanály", "Politika špičky", "Dispense typ", "Míchání (cykly × µL)", "Třída přesnosti (list 6)", "Čekání / manuální krok (s)", "Poznámka"],
       steps, [5, 22, 26, 20, 14, 10, 18, 10, 26, 22, 18, 16, 20, 30], fill_cols=tuple(range(2, 15)), nrows_extra=40,
       validations={"G": ["forward", "reverse", "multi-dispense", "auto"],
-                   "H": ["1", "8", "12", "16", "auto"],
+                   "H": ["1", "8", "12", "16", "levý krajní", "pravý krajní", "auto"],
                    "I": ["nová na jamku/sloupec", "1 na krok (reuse)", "1 na reagencii napříč destičkami", "1 na reagencii napříč runy (vrátit do racku)", "auto (dle kvality+kapaliny)"],
                    "J": ["air (bezkontaktně)", "wall-touch (unikátní místo)", "liquid-contact", "auto"],
                    "L": ["A", "B", "C"]})
@@ -170,6 +183,32 @@ run = [
 ]
 sheet("7_Run", ["Parametr", "Hodnota", "Jednotka / možnosti", "Výchozí"], run, [50, 20, 40, 14], fill_cols=(2,))
 
+# ---------------------------------------------------------------- 9 Configurations (customer's table)
+conf = [
+    ("A1+B1", "IN_TUBES – vzorky: 2 holdery po 96 Eppendorf 1,5 mL nebo QIAGEN 2,0 mL (dvojslotová svislá dvojice)", "stejné", "obě"),
+    ("A2", "96 TIPS pro vzorky", "stejné", "obě"),
+    ("B2", "96 TIPS pro R-primery NEBO pufry", "stejné", "obě"),
+    ("A3", "OUT_PLATE / MAGNETIC PLATE / IN_PLATE (PCR 200 µL, chlazení)", "RESERVOIRS", "obě"),
+    ("B3", "96_R-PRIMERS (PCR 200 µL, chlazení) nebo OUT_PLATE (PCR 200 µL, chlazení)", "RESERVOIRS", "obě"),
+    ("1", "WASTE", "stejné", "obě"),
+    ("2", "8 F-PRIMERS + MM mix (pro 1 plate)", "stejné", "obě"),
+    ("3", "Alkalický / neutralizační pufr (pro 1 plate)", "stejné", "obě"),
+    ("C1–C3", "", "", ""),
+    ("L / R", "", "", ""),
+]
+sheet("9_Konfigurace", ["Slot", "Konfigurace s pipetou 12,5 µL (z tabulky zákazníka)", "Konfigurace s pipetou 300 µL", "Platí pro kroky"],
+      conf, [10, 80, 34, 20], fill_cols=(2, 3, 4), assume_cols=(1,), nrows_extra=6)
+
+# ---------------------------------------------------------------- 10 Pick list
+pick = [("pl1", "samples#0", "A1", 10, "plate96_pcr#0", "A1", "", "")]
+sheet("10_Pick_list", ["Seznam", "Zdroj (labware)", "Zdrojová jamka", "Objem µL", "Cíl (labware)", "Cílová jamka", "Kanál (levý/pravý/auto)", "Poznámka"],
+      pick, [10, 22, 14, 10, 22, 14, 22, 40], fill_cols=tuple(range(1, 9)), nrows_extra=60,
+      validations={"G": ["auto", "levý krajní", "pravý krajní", "libovolný 1 kanál"]})
+ws = wb["10_Pick_list"]
+ws.append([None])
+ws.append(["Cherry-picking / pooling / repliky: libovolný seznam přenosů. Plánovač seskupí přenosy do vícekanálových pohybů, pokud jamky sedí na rozteči 9 mm, jinak použije 1 (krajní) kanál."])
+ws.append(["Pooling = více zdrojů do 1 cílové jamky (nová špička na zdroj, pokud se špička dotýká kapaliny); repliky = 1 zdroj do více cílů."])
+
 # ---------------------------------------------------------------- 8 Pipettes (from the customer's list)
 rows = []
 if SRC:
@@ -193,6 +232,7 @@ if SRC:
 ws = sheet("8_Pipety", ["Katalog. č.", "Typ", "Rozsah", "Kanálů", "Kompatibilní špičky", "Rozteč / min mm", "Rozteč max mm", "Na robotu? (ano/ne)"],
            rows, [14, 28, 16, 8, 20, 14, 14, 18], fill_cols=(8,), validations={"H": ["ano", "ne"]})
 
+wb.move_sheet("8_Pipety", offset=-2)
 out = "docs/labot_zadani_parametry.xlsx"
 wb.save(out)
 print(out, len(rows), "pipettes")
