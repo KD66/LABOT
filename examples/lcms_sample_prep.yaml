@@ -1,0 +1,8 @@
+# LC-MS protein precipitation, 96 samples, 8 channels, 6 runs/day
+name: lcms_prep
+process: lcms_sample_prep
+samples_per_run: 96
+runs_per_day: 6
+channels: [8]
+hours_per_day: 8
+params: {sample_ul: 50, is_ul: 10, solvent_ul: 150, transfer_ul: 100, spin_s: 900}

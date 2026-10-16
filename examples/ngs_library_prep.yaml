@@ -1,0 +1,8 @@
+# NGS library prep, 96 samples from Eppendorf tubes, 4 runs/day
+name: ngs_lib_prep
+process: ngs_library_prep
+samples_per_run: 96
+runs_per_day: 4
+channels: [1, 8]          # let the planner compare; set a single number to fix it
+hours_per_day: 10
+params: {sample_ul: 10, frag_mm_ul: 15, index_ul: 5, pcr_mm_ul: 25, incubate_s: 1800}
