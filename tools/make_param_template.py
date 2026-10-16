@@ -64,6 +64,7 @@ for line in [
     "8_Pipety     – seznam ClipTip pipet (ze zaslané tabulky) – zaškrtněte, které robot reálně má",
     "9_Konfigurace – obsah slotů pro 12,5 µL a 300 µL pipetu (předvyplněno z vaší tabulky)",
     "10_Pick_list – cherry-picking / pooling / repliky jako seznam přenosů",
+    "11_Prikazy_G – logické operace pipety a vaše G-kódy (pořadí: blow-out → drop → confirm …)",
     "",
     "Pojmy: správnost (trueness) = systematická odchylka od nominálního objemu v % nebo µL;",
     "přesnost (precision) = náhodná odchylka, CV v %. Vyplňte pro každou třídu kroku (list 6).",
@@ -97,6 +98,25 @@ robot = [
     ("Moduly na decku (třepačka, ohřev, chlazení, magnet)", "", "seznam + sloty", "zabírají sloty", "žádné"),
     ("Vzorkové racky 96× Eppendorf – zabírají 2 sloty", "A1+B1 (svisle) – dle tabulky zákazníka", "svisle (A+B) / vodorovně", "povolená poloha dvojslotové položky", "svisle"),
     ("Typ špiček (ClipTip) a balení", "", "12,5 / 200 / 300 / 1250 / 1000 / 384×; rack 96 nebo 384", "kapacita racků na decku", ""),
+]
+_upd = {
+    "Pipetovací hlava – typ": "8 kanálů, osa řady podél X; fixní rozteč 9 mm i roztahovací (Equalizer)",
+    "Počet pipet/hlav současně na gantry": "1 – vždy jen jedna, rychlá výměna",
+    "Rozsah pipety / pipet (viz list 8)": "12,5 / 300 / 1250 µL (všechny 8 kanálů)",
+    "Dispense režimy podporované hlavou": "forward, reverse, multi-dispense, blow-out, vrácení špičky do racku (vlastní G-kódy pístu)",
+    "Vrácení špičky do racku (tip return)": "ano",
+    "Detekce hladiny (LLD)": "",
+}
+robot = [(p_, _upd.get(p_, v_), o_, w_, d_) for (p_, v_, o_, w_, d_) in robot]
+robot += [
+    ("Drop špičky – řízení", "stepper motor; vždy musí předcházet blow-out", "popis", "pevné pravidlo příkazové gramatiky (list 11)", "blow-out → drop"),
+    ("Příkaz Confirm", "vynuluje pozici stepper motoru", "kdy přesně se posílá? (po každém dropu / po nasazení / po každém pohybu pístu)", "pořadí příkazů v kódu runu", ""),
+    ("Tip racky: povýšení v Z", "uprostřed (A2/B2) a zvýšené", "výška podstavce v mm", "jednotlivá špička levým/pravým kanálem – ostatní kanály přečnívají nad sousedy", ""),
+    ("Délka špičky ClipTip 12,5 / 300 / 1250", "", "mm", "kolizní kontrola přečnívajících kanálů bez špičky", ""),
+    ("Odběr jednotlivých špiček z racku", "levý kanál od jednoho kraje, pravý od druhého (od kraje dovnitř)", "potvrdit pořadí", "plánovač spotřeby špiček a kolizní pravidla", ""),
+    ("Equalizer – změna rozteče", "", "řízeno G-kódem / ručně; rozsah mm; doba změny s", "krok s přenosem mezi různými rozteč. formáty", ""),
+    ("Výměna pipety – doba a postup", "", "s; nutný homing / Confirm / kalibrace?", "řazení kroků podle pipety (minimum výměn)", ""),
+    ("Rozsah pojezdů X / Y / Z a bezpečná Z", "", "mm", "dosah na boční pozice, kolize", ""),
 ]
 sheet("1_Robot", ["Parametr", "Hodnota", "Možnosti / jednotka", "K čemu to plánovač potřebuje", "Výchozí"],
       robot, [42, 28, 50, 60, 22], fill_cols=(2,))
@@ -209,6 +229,25 @@ ws.append([None])
 ws.append(["Cherry-picking / pooling / repliky: libovolný seznam přenosů. Plánovač seskupí přenosy do vícekanálových pohybů, pokud jamky sedí na rozteči 9 mm, jinak použije 1 (krajní) kanál."])
 ws.append(["Pooling = více zdrojů do 1 cílové jamky (nová špička na zdroj, pokud se špička dotýká kapaliny); repliky = 1 zdroj do více cílů."])
 
+# ---------------------------------------------------------------- 11 Command grammar
+cg = [
+    ("pick_up_tip", "nasazení špičky(ek) – všechny kanály nebo maska / krajní kanál", "rack, sloupec, kanály", "rack zvýšený; při jedné špičce odběr od kraje dovnitř", "", ""),
+    ("aspirate (forward)", "nasátí", "objem, rychlost, výška", "špička nasazená", "", ""),
+    ("dispense (forward)", "vydání", "objem, rychlost, výška", "", "", ""),
+    ("aspirate/dispense (reverse)", "reverse pipetting", "objem + přebytek", "", "", ""),
+    ("multi-dispense", "více dávek z jednoho nasátí", "objem dávky, počet dávek, přebytek", "k = ⌊(Vmax − přebytek)/v⌋", "", ""),
+    ("blow_out", "vyfouknutí zbytku", "", "VŽDY před drop_tip", "", ""),
+    ("drop_tip", "odhození špičky stepper motorem", "", "bezprostředně po blow_out", "", ""),
+    ("confirm", "vynulování pozice stepper motoru", "", "kdy se posílá – doplnit", "", ""),
+    ("return_tip_to_rack", "vrácení špičky na původní pozici v racku", "rack, pozice", "blow_out? rack musí být dosažitelný týmž kanálem", "", ""),
+    ("mix", "míchání pístem", "objem, cykly", "", "", ""),
+    ("move X/Y/Z", "pojezd gantry", "souřadnice, rychlost", "bezpečná Z při přejezdu", "", ""),
+    ("pipette_swap", "výměna pipety", "z → na", "vždy jen jedna pipeta; po výměně homing/confirm?", "", ""),
+    ("set_spacing", "Equalizer – rozteč kanálů", "mm", "jen u roztahovací pipety", "", ""),
+]
+sheet("11_Prikazy_G", ["Operace (logická)", "Význam", "Parametry", "Pravidla / pořadí", "Vaše G-kódy (příkaz + parametry)", "Doba s / poznámka"],
+      cg, [26, 46, 34, 46, 46, 24], fill_cols=(5, 6), assume_cols=(1, 2, 3, 4), nrows_extra=8)
+
 # ---------------------------------------------------------------- 8 Pipettes (from the customer's list)
 rows = []
 if SRC:
@@ -226,13 +265,13 @@ if SRC:
             mode = "jednokanálová"
         elif s[:4].isdigit() and s.endswith("BT"):
             if mode == "jednokanálová":
-                rows.append((r[0], mode, r[1], 1, r[3], r[4], "", ""))
+                rows.append((r[0], mode, r[1], 1, r[3], r[4], "", "ne"))
             else:
-                rows.append((r[0], mode, r[1], r[2], r[3], r[4], r[5] if mode.endswith("Equalizer") else "", ""))
+                rows.append((r[0], mode, r[1], r[2], r[3], r[4], r[5] if mode.endswith("Equalizer") else "", "ano (předpoklad)" if (r[2] == 8 and r[3] in ("ClipTip 12.5", "ClipTip 300", "ClipTip 1250", "ClipTip 384 12.5") and r[1] in ("0.5 to 12.5 μL", "10 to 300 μL", "15 to 1250 μL")) else ""))
 ws = sheet("8_Pipety", ["Katalog. č.", "Typ", "Rozsah", "Kanálů", "Kompatibilní špičky", "Rozteč / min mm", "Rozteč max mm", "Na robotu? (ano/ne)"],
-           rows, [14, 28, 16, 8, 20, 14, 14, 18], fill_cols=(8,), validations={"H": ["ano", "ne"]})
+           rows, [14, 28, 16, 8, 20, 14, 14, 18], fill_cols=(8,), assume_cols=(8,), validations={"H": ["ano", "ano (předpoklad)", "ne"]})
 
-wb.move_sheet("8_Pipety", offset=-2)
+wb.move_sheet("8_Pipety", offset=-3)
 out = "docs/labot_zadani_parametry.xlsx"
 wb.save(out)
 print(out, len(rows), "pipettes")

@@ -14,6 +14,25 @@ Půdorys: `docs/deck_floorplan.png|svg`. Tabulka k vyplnění: `docs/labot_zadan
 * Dvě konfigurace podle pipety: 12,5 µL (A3/B3 = plate, chlazení/magnet) a 300 µL (A3/B3 = zásobníky).
 * Neověřeno: která strana je přední, poloha slotu vůči kotvám, měřítko (odvozeno z rozteče slotů).
 
+## 0b. Špičky, pipety a ovládání (z odpovědí zákazníka)
+**Tip racky uprostřed a zvýšené v Z.** Jednotlivou špičku bere levý nebo pravý kanál; ostatní kanály nemají špičku a přečnívají přes okraj racku
+nad sousední labware, jehož horní hrana musí být pod kužely těchto kanálů (proto zvýšený rack, viz `docs/tip_pickup_geometry.png`).
+Důsledky pro plánovač:
+* racky špiček pevně ve sloupci 2 (A2, B2); ostatní labware v sousedních sloupcích musí být nižší než zvýšený rack (výška = parametr);
+* pořadí spotřeby při jednotlivých špičkách jde **od kraje dovnitř** (levý kanál od jednoho kraje, pravý od druhého), jinak by přečnívající kanály
+  najely na špičky; plný sloupec (8 špiček) se bere bez omezení;
+* kolizní kontrola pro každou operaci s maskou kanálů: pod každým kanálem bez špičky nesmí být labware vyšší než (Z práce + délka špičky − rezerva);
+* vrácení špičky do racku = špička drží svou pozici → „parkování“ špiček na reagencii (F-primery: 8 kanálů = 8 vlastních špiček na celý run
+  i napříč destičkami; R-primery: nová špička na primer = rack B2).
+
+**Pipety:** 12,5 / 300 / 1250 µL, 8 kanálů, fixní 9 mm i roztahovací (Equalizer). Vždy jen jedna, výměna rychlá, ale je to událost s cenou
+→ kroky řadit podle pipety (minimum výměn, pořadí respektující závislosti); každý typ pipety potřebuje vlastní rack špiček (A2/B2 jsou jen dva)
+→ konfigurace racků se mění spolu s pipetou (12,5 µL: A2 vzorky, B2 R-primery; 300 µL: B2 pufry).
+
+**Příkazová gramatika (G-kódy pístu):** forward, reverse, multi-dispense, blow-out, vrácení špičky do racku. Drop je stepper motor →
+makro `DROP = blow_out → drop_tip → confirm` (Confirm = vynulování stepperu; přesný okamžik k potvrzení). Generátor kódu bude tvrdě hlídat:
+drop jen po blow-outu, žádný aspirate bez špičky, žádné míchání při znovupoužité špičce, maximální objem = horní mez pipety.
+
 ## Cherry-picking, pooling, repliky
 Fyzicky nejsou omezené: špička se nasadí jen na krajní kanál (levý/pravý) nebo na masku kanálů a přenos jde z libovolné jamky do libovolné.
 Dřívější „bez cherry-pickingu“ byla mezera v plánovači, ne limit robota. Plán: krok `pick_list` (seznam zdroj→cíl, objem), plánovač seskupí

@@ -43,19 +43,20 @@ COL = dict(tips="#cfd4da", samples="#9ec5fe", plate="#a3cfbb", reagent="#ffd29c"
            res="#d9c2f0", none="#ffffff", mod="#a3cfbb")
 
 
-def rect_px(ax, xr, yr, fc="#fff", ec="#333", lw=1.1, ls="-", z=2):
+def rect_px(ax, xr, yr, fc="#fff", ec="#333", lw=1.1, ls="-", z=2, hatch=None):
     x0, y1 = mm(xr[0], yr[0])
     x1, y0 = mm(xr[1], yr[1])
-    ax.add_patch(FancyBboxPatch((x0, y0), x1 - x0, y1 - y0, boxstyle="round,pad=0,rounding_size=2.5", fc=fc, ec=ec, lw=lw, ls=ls, zorder=z))
+    ax.add_patch(FancyBboxPatch((x0, y0), x1 - x0, y1 - y0, boxstyle="round,pad=0,rounding_size=2.5", fc=fc, ec=ec, lw=lw, ls=ls, zorder=z, hatch=hatch))
     return x0, y0, x1 - x0, y1 - y0
 
 
-def label(ax, xr, yr, text, fs=6.3, sid=None, color="#111"):
+def label(ax, xr, yr, text, fs=6.3, sid=None, color="#111", bg=None):
     x, y, w, h = rect_px_dims(xr, yr)
     if sid:
         ax.text(x + 2, y + h - 2, sid, fontsize=6.5, va="top", color="#555", zorder=5, fontweight="bold")
     if text:
-        ax.text(x + w / 2, y + h / 2, text, ha="center", va="center", fontsize=fs, zorder=5, linespacing=1.15, color=color)
+        ax.text(x + w / 2, y + h / 2, text, ha="center", va="center", fontsize=fs, zorder=5, linespacing=1.15, color=color,
+                bbox=dict(fc=bg, ec="none", pad=2.0) if bg else None)
 
 
 def rect_px_dims(xr, yr):
@@ -104,8 +105,9 @@ def base_slots(ax, items=None, sid_names=True):
             yr_draw = yr
             if it and it[2:] == ("tall",):             # A + B column
                 yr_draw = (ROW_B[0], ROW_A[1])
-            rect_px(ax, xr, yr_draw, fc=fc, ls=ls)
-            label(ax, xr, yr_draw, it[0] if it else ("volné" if items else ""), sid=sid)
+            raised = bool(it and it[1] == "tips")
+            rect_px(ax, xr, yr_draw, fc=fc, ls=ls, hatch="//" if raised else None)
+            label(ax, xr, yr_draw, (it[0] + ("\n↑ zvýšený rack (Z)" if raised else "")) if it else ("volné" if items else ""), sid=sid, bg="#cfd4da" if raised else None)
     # side zones
     for sid, xr in (("L", SIDE_L), ("R", SIDE_R)):
         it = items.get(sid)
@@ -132,7 +134,7 @@ cfg125 = {
     "A2": ("96 TIPS\npro vzorky", "tips"),
     "B2": ("96 TIPS\nR-primery\nnebo pufry", "tips"),
     "A3": ("OUT_PLATE\n/ MAGNETIC PLATE\n/ IN_PLATE\n(PCR 200 µL, chlazení)", "plate"),
-    "B3": ("96_R-PRIMERS\n(PCR 200 µL, chlazení)\nnebo OUT_PLATE", "plate"),
+    "B3": ("96_R-PRIMERS\n(PCR 200 µL)\nnebo OUT_PLATE\n(PCR 200 µL, chlazení)", "plate"),
     "1": ("WASTE", "waste"),
     "2": ("8 F-PRIMERS\n+ MM mix\n(pro 1 plate)", "reagent"),
     "3": ("alkalický /\nneutralizační pufr\n(pro 1 plate)", "reagent"),
@@ -141,7 +143,7 @@ ax = axes[1]
 frame(ax, "B) Konfigurace s pipetou 12,5 µL (podle tabulky zákazníka)")
 base_slots(ax, cfg125)
 ax.text(-198, -212, "Rack 96 zkumavek = dva holdery ve sloupci 1 (A1+B1): dvouslotová dvojice je SVISLÁ.\n"
-        "C1–C3 (zadní úzká řada) v tabulce chybí → doplnit využití.", fontsize=7, va="top", linespacing=1.35)
+        "C1–C3 (zadní úzká řada) v tabulce chybí → doplnit využití.\nŠpičky uprostřed a ZVÝŠENÉ v Z: jednotlivou špičku bere levý/pravý kanál, ostatní kanály přečnívají nad sousedy.", fontsize=7, va="top", linespacing=1.35)
 
 # ---- C: 300 uL
 cfg300 = dict(cfg125)
