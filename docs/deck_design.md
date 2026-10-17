@@ -25,13 +25,31 @@ Důsledky pro plánovač:
 * vrácení špičky do racku = špička drží svou pozici → „parkování“ špiček na reagencii (F-primery: 8 kanálů = 8 vlastních špiček na celý run
   i napříč destičkami; R-primery: nová špička na primer = rack B2).
 
-**Pipety:** 12,5 / 300 / 1250 µL, 8 kanálů, fixní 9 mm i roztahovací (Equalizer). Vždy jen jedna, výměna rychlá, ale je to událost s cenou
-→ kroky řadit podle pipety (minimum výměn, pořadí respektující závislosti); každý typ pipety potřebuje vlastní rack špiček (A2/B2 jsou jen dva)
-→ konfigurace racků se mění spolu s pipetou (12,5 µL: A2 vzorky, B2 R-primery; 300 µL: B2 pufry).
+**Pipety:** 12,5 / 300 / 1250 µL, 8 kanálů, fixní 9 mm i roztahovací (Equalizer; rozteč řízena G-kódem na samostatném servu).
+Výměna je ruční a výjimečná → **jeden běh = jedna pipeta**. Plánovač proto musí pro celý běh vybrat jednu pipetu, jejíž rozsah pokryje všechny
+objemy (nad horní mezí se dělí / multi-dispense, pod dolní mezí je krok neproveditelný) a odpovídá třídě přesnosti. Rack špiček pro zvolenou
+pipetu je v A2/B2; konfigurace A3/B3 (12,5 µL: plate, 300 µL: zásobníky) se mění jen mezi běhy.
 
-**Příkazová gramatika (G-kódy pístu):** forward, reverse, multi-dispense, blow-out, vrácení špičky do racku. Drop je stepper motor →
-makro `DROP = blow_out → drop_tip → confirm` (Confirm = vynulování stepperu; přesný okamžik k potvrzení). Generátor kódu bude tvrdě hlídat:
-drop jen po blow-outu, žádný aspirate bez špičky, žádné míchání při znovupoužité špičce, maximální objem = horní mez pipety.
+**Příkazová gramatika:** forward, reverse, multi-dispense, blow-out, vrácení špičky do racku. Drop je stepper motor →
+makro `DROP = blow_out → drop_tip`. `confirm` se posílá jen na začátku běhu po `home` (kontrola X, Y, Z). Generátor kódu hlídá:
+drop jen po blow-outu, žádný aspirate bez špičky, žádné míchání při znovupoužité špičce, objem v rozsahu pipety.
+
+**Výška racků špiček:** liší se podle racku a je výstupem optimalizace (kolize s přečnívajícími kanály); horní mez = délka špičky (30–120 mm
+podle pipety) + 25 mm (přesný význam k potvrzení, viz list 12_Rozmery M6).
+
+## 0c. Strategické plánování (model, ne rychlosti)
+Rychlosti a zrychlení se odkládají (config + rules dodá zákazník). Optimalizuje se **počet a délka pohybů**.
+* Událost: (pipeta, maska kanálů, zdrojové jamky, cílové jamky, objem, režim forward/reverse/multi, dispense air/wall/liquid, politika špičky).
+* Cena J = w₁·počet nasátí + w₂·počet přejezdů mezi pozicemi + w₃·Σ vzdálenost přejezdů (mm) + w₄·počet nasazení/odhození/vrácení špiček;
+  váhy jsou nastavitelné, výchozí lexikograficky: kvalita (tvrdé omezení) → přejezdy → vzdálenost → špičky.
+* Proměnné: přiřazení labware → pozice (≤ 18 pozic: 6 hlavních, 2×3 úzké, 2×3 boční, kde pozice = střed na šroubu), pořadí kroků v rámci závislostí,
+  seskupení do multi-dispense, maska kanálů, politika špičky.
+* Tvrdá omezení: rozsah pipety, třída přesnosti → povolený režim/kontakt/reuse, kapacita špičky, dosah (boční pozice jen krajní kanál),
+  rack Eppendorf = 2 sousední pozice (svisle A+B), úzká řada ≤ 2 řady, kolize (výška racků vs sousedé), jedna pipeta na běh.
+* Řešení: pozic i labware je málo → úplné prohledání s ořezáním (branch & bound) a přesné vyhodnocení J simulací běhu; pořadí kroků lokálním hledáním.
+  Výstup: pořadí rozložení + rozpad J (kolik přejezdů a kde), aby bylo vidět, co rozložení stojí.
+* Geometrie pro výpočty: pozice = střed plasticware na šroubech, stejné mezery mezi pozicemi v Y; posun o housing (≈ 40 mm) a dosah bočních šroubů
+  (−20 mm) se zatím ignorují. Potřebné rozměry: `docs/labot_zadani_parametry.xlsx`, list `12_Rozmery`.
 
 ## Cherry-picking, pooling, repliky
 Fyzicky nejsou omezené: špička se nasadí jen na krajní kanál (levý/pravý) nebo na masku kanálů a přenos jde z libovolné jamky do libovolné.

@@ -64,7 +64,8 @@ for line in [
     "8_Pipety     – seznam ClipTip pipet (ze zaslané tabulky) – zaškrtněte, které robot reálně má",
     "9_Konfigurace – obsah slotů pro 12,5 µL a 300 µL pipetu (předvyplněno z vaší tabulky)",
     "10_Pick_list – cherry-picking / pooling / repliky jako seznam přenosů",
-    "11_Prikazy_G – logické operace pipety a vaše G-kódy (pořadí: blow-out → drop → confirm …)",
+    "11_Prikazy_G – logické operace pipety a vaše G-kódy (home → confirm; blow_out → drop_tip …)",
+    "12_Rozmery   – rozměry potřebné pro výpočty (stav: známo / hypotéza / čeká)",
     "",
     "Pojmy: správnost (trueness) = systematická odchylka od nominálního objemu v % nebo µL;",
     "přesnost (precision) = náhodná odchylka, CV v %. Vyplňte pro každou třídu kroku (list 6).",
@@ -76,18 +77,18 @@ ws["A1"].font = Font(bold=True, size=14)
 # ---------------------------------------------------------------- 1 Robot
 robot = [
     ("Pipetovací hlava – typ", "", "1 kanál / 8 / 12 / 16 / Equalizer (nastavitelná rozteč) / jiné", "volí počet jednotek na pohyb a dosah do úzkých slotů", ""),
-    ("Počet pipet/hlav současně na gantry", "", "1 / 2 / výměna nástroje", "určuje, zda lze střídat rozsahy bez zásahu", "1"),
+    ("Počet pipet/hlav současně na gantry", "1 – vždy jen jedna, výměna ruční a výjimečná", "1 / 2 / výměna nástroje", "jeden běh = jedna pipeta", "1"),
     ("Osa řady kanálů vůči decku", "podél X (zleva doprava) – odvozeno z boční pozice 'levý/pravý kanál' a SBS na výšku", "podél X / podél Y", "potvrdit; sloupec 96w destičky (A–H) leží podél X, 8 kanálů se vejde do úzké řady 1×8 zkumavek", "podél X"),
     ("Boční pozice L/R – které kanály dosáhnou", "jen krajní kanál (levý pro L, pravý pro R)", "kanál č. / všechny", "cherry-picking a odběr z vakutejnerů, 15/50 mL, Eppendorf", "krajní"),
     ("Jednotlivé kanály: lze nasadit špičku jen na vybrané kanály (maska)?", "", "ano / ne / jen krajní", "cherry-picking, pooling, částečné sloupce", "ano"),
-    ("Výměna pipety mezi konfiguracemi (12,5 µL ⇄ 300 µL)", "", "ruční / automatická / hlava výměnná", "počet zásahů obsluhy za run; kdy se mění konfigurace A3/B3", "ruční"),
+    ("Výměna pipety mezi konfiguracemi (12,5 µL ⇄ 300 µL)", "ruční, výjimečná, mimo běh", "ruční / automatická / hlava výměnná", "konfigurace A3/B3 se mění jen mezi běhy", "ruční"),
     ("Rozteč kanálů (min / max)", "", "mm (9 / 4,5 / 9–19,8 …)", "9 mm hlava na 384 destičce = každý 2. řádek, 4 průchody; 4,5 mm hlava = celý sloupec", "9"),
     ("Rozsah pipety / pipet (viz list 8)", "", "µL min–max", "horní mez = max. nasátý objem na špičku (ne jmenovitý objem špičky)", ""),
     ("Pracovní okno přesnosti", "", "např. ≥ 10 % max. objemu pipety", "pod tím se krok nesmí dělat touto pipetou", "≥10 % max."),
     ("Dispense režimy podporované hlavou", "", "forward / reverse / multi-dispense (repeat) / blow-out / mix / touch-off / air-gap / pre-wet", "řídí, co smí plánovač použít", "forward, reverse, multi, mix"),
     ("Multi-dispense: minimální/typický přebytek", "", "µL na kanál", "ztráty a počet dávek na 1 nasátí", "5"),
     ("Prime/zahozená první dávka", "", "ano / ne", "zpřesňuje první dávku při multi-dispense", "ne"),
-    ("Detekce hladiny (LLD)", "", "ano / ne / kapacitní / tlaková", "bezkontaktní dávkování a nasávání z nízkých objemů", "ne"),
+    ("Detekce hladiny (LLD)", "", "ano / ne / kapacitní / tlaková", "bezkontaktní dávkování – bez LLD se výška hladiny počítá z objemu a geometrie jamky", "ne"),
     ("Dispense: kontakt se stěnou/hladinou", "", "air / wall-touch / liquid-contact – které jsou řiditelné", "pravidla znovupoužití špičky", "air, wall-touch"),
     ("Vrácení špičky do racku (tip return)", "", "ano / ne", "umožní znovupoužití špiček mezi runy a úsporu špiček", ""),
     ("Odpad špiček – poloha", "", "souřadnice nebo slot", "dráha eject", ""),
@@ -106,16 +107,18 @@ _upd = {
     "Dispense režimy podporované hlavou": "forward, reverse, multi-dispense, blow-out, vrácení špičky do racku (vlastní G-kódy pístu)",
     "Vrácení špičky do racku (tip return)": "ano",
     "Detekce hladiny (LLD)": "",
+    "Příkaz Confirm": "",
 }
 robot = [(p_, _upd.get(p_, v_), o_, w_, d_) for (p_, v_, o_, w_, d_) in robot]
 robot += [
-    ("Drop špičky – řízení", "stepper motor; vždy musí předcházet blow-out", "popis", "pevné pravidlo příkazové gramatiky (list 11)", "blow-out → drop"),
-    ("Příkaz Confirm", "vynuluje pozici stepper motoru", "kdy přesně se posílá? (po každém dropu / po nasazení / po každém pohybu pístu)", "pořadí příkazů v kódu runu", ""),
-    ("Tip racky: povýšení v Z", "uprostřed (A2/B2) a zvýšené", "výška podstavce v mm", "jednotlivá špička levým/pravým kanálem – ostatní kanály přečnívají nad sousedy", ""),
+    ("Drop špičky – řízení", "stepper motor; vždy musí předcházet blow-out", "popis", "pevné pravidlo příkazové gramatiky (list 11)", "blow_out → drop_tip"),
+    ("Příkaz Confirm", "jen na začátku běhu po Home (kontrola pozice X, Y, Z)", "není součástí drop makra", "gramatika příkazů", "po Home"),
+    ("Tip racky: povýšení v Z", "výška se liší podle rack a je optimalizovaná kvůli kolizím; max zdvih = délka špičky (30–120 mm dle pipety) + 25 mm", "mm na rack (výstup optimalizace)", "jednotlivá špička levým/pravým kanálem – ostatní kanály přečnívají nad sousedy", ""),
     ("Délka špičky ClipTip 12,5 / 300 / 1250", "", "mm", "kolizní kontrola přečnívajících kanálů bez špičky", ""),
     ("Odběr jednotlivých špiček z racku", "levý kanál od jednoho kraje, pravý od druhého (od kraje dovnitř)", "potvrdit pořadí", "plánovač spotřeby špiček a kolizní pravidla", ""),
-    ("Equalizer – změna rozteče", "", "řízeno G-kódem / ručně; rozsah mm; doba změny s", "krok s přenosem mezi různými rozteč. formáty", ""),
-    ("Výměna pipety – doba a postup", "", "s; nutný homing / Confirm / kalibrace?", "řazení kroků podle pipety (minimum výměn)", ""),
+    ("Equalizer – změna rozteče", "G-kód, samostatné servo; rozsah viz list 8", "mm", "krok s přenosem mezi různými rozteč. formáty", ""),
+    ("Výměna pipety", "ruční, výjimečná – v jednom běhu se s ní nepočítá", "", "jeden běh = jedna pipeta (rozsah objemů musí pokrýt všechny kroky)", "1 pipeta / běh"),
+    ("Rychlosti a zrychlení X/Y/Z", "odloženo – dodá zákazník v konfiguračním souboru a pravidlech", "", "strategické plánování počítá počty pohybů a vzdálenosti, ne čas", ""),
     ("Rozsah pojezdů X / Y / Z a bezpečná Z", "", "mm", "dosah na boční pozice, kolize", ""),
 ]
 sheet("1_Robot", ["Parametr", "Hodnota", "Možnosti / jednotka", "K čemu to plánovač potřebuje", "Výchozí"],
@@ -191,6 +194,7 @@ run = [
     ("Runů za den", "", "počet", ""),
     ("Pracovní doba robota za den", "", "h", "8"),
     ("Přestavba mezi runy (nakládka/vykládka)", "", "min", "10"),
+    ("Pipeta pro běh (jedna)", "", "12,5 / 300 / 1250 µL (+ fixní / Equalizer)", "plánovač zvolí podle rozsahu objemů, pokud nezadáte"),
     ("Formát destiček", "", "96 / 384 / smíšené", "96"),
     ("Proměnný počet vzorků (částečné sloupce)", "", "ano / ne", "ne"),
     ("Dohled obsluhy – max. počet zásahů na run", "", "počet (výměny racků apod.)", "1"),
@@ -238,15 +242,46 @@ cg = [
     ("multi-dispense", "více dávek z jednoho nasátí", "objem dávky, počet dávek, přebytek", "k = ⌊(Vmax − přebytek)/v⌋", "", ""),
     ("blow_out", "vyfouknutí zbytku", "", "VŽDY před drop_tip", "", ""),
     ("drop_tip", "odhození špičky stepper motorem", "", "bezprostředně po blow_out", "", ""),
-    ("confirm", "vynulování pozice stepper motoru", "", "kdy se posílá – doplnit", "", ""),
+    ("confirm", "vynulování pozice stepper motoru", "", "jen na začátku běhu po Home (kontrola X, Y, Z)", "", ""),
     ("return_tip_to_rack", "vrácení špičky na původní pozici v racku", "rack, pozice", "blow_out? rack musí být dosažitelný týmž kanálem", "", ""),
     ("mix", "míchání pístem", "objem, cykly", "", "", ""),
     ("move X/Y/Z", "pojezd gantry", "souřadnice, rychlost", "bezpečná Z při přejezdu", "", ""),
-    ("pipette_swap", "výměna pipety", "z → na", "vždy jen jedna pipeta; po výměně homing/confirm?", "", ""),
+    ("home", "Home + kontrola pozice X, Y, Z", "", "na začátku běhu, následuje confirm", "", ""),
     ("set_spacing", "Equalizer – rozteč kanálů", "mm", "jen u roztahovací pipety", "", ""),
 ]
 sheet("11_Prikazy_G", ["Operace (logická)", "Význam", "Parametry", "Pravidla / pořadí", "Vaše G-kódy (příkaz + parametry)", "Doba s / poznámka"],
       cg, [26, 46, 34, 46, 46, 24], fill_cols=(5, 6), assume_cols=(1, 2, 3, 4), nrows_extra=8)
+
+# ---------------------------------------------------------------- 12 Dimensions
+dims = [
+ # id, group, quantity, status/value, unit, source, used for
+ ("D1", "Deck", "Rozteč kotev hlavních slotů ve směru X (střed trojúhelníku ↔ střed sousedního)", "HYPOTÉZA 90 (z výkresu jen px: 187)", "mm", "výkres kotev", "jediné číslo dá měřítko celého výkresu; poloha všech pozic"),
+ ("D2", "Deck", "Rozteč ve směru Y (A ↔ B)", "HYPOTÉZA 135 (poměr Y/X změřen 1,50)", "mm", "výkres kotev", "vzdálenosti přejezdů, mezera mezi plasticware"),
+ ("D3", "Deck", "Trojúhelník kotev: základna × výška", "z výkresu ≈ ½·P_x × P_x (45 × 90)", "mm", "výkres kotev", "střed plasticware = střed trojúhelníku?"),
+ ("D4", "Deck", "Úzké řady 1–3 a C1–C3: kolik pozic a kde je střed vůči 3 šroubům v řadě", "ČEKÁ – hypotéza: každý šroub = střed jedné pozice (rozteč ≈ 135)", "ano/ne", "tabulka + výkres", "poloha úzkých pozic; konflikt s přední hranou A při středění na šroub"),
+ ("D5", "Deck", "Boční pozice L/R: kolik pozic na stranu a střed vůči šroubům", "ČEKÁ – hypotéza: 3 pozice na stranu, střed na šroubu (Y rozteč ≈ 135, X ≈ ±189 od středu)", "mm", "výkres kotev", "boční labware a dosah krajního kanálu"),
+ ("D6", "Deck", "Posun pozic dopředu (housing pipety, ≈ 40 mm) a dosah bočních šroubů −20 mm", "IGNOROVAT (zadáno)", "mm", "zákazník", "–"),
+ ("D7", "Deck", "Mezery mezi plasticware", "vyplývají z rozteče kotev − rozměr labware (stejná mezera v Y)", "mm", "D1–D2, L1", "kontrola kolizí, vycentrování na šrouby"),
+ ("M1", "Stroj", "Rozsah pojezdů X / Y / Z", "ČEKÁ (nebo v config souboru)", "mm", "config", "kontrola dosahu, boční pozice"),
+ ("M2", "Stroj", "Home pozice a vztah k souřadnicím kotev", "ČEKÁ (v config souboru)", "mm", "config", "převod pozice → G-kód souřadnice"),
+ ("M3", "Stroj", "Referenční kanál pro XY (K1 / střed hlavy) a offset ostatních kanálů", "ČEKÁ", "mm", "config", "poloha k-tého kanálu = ref + (k−1)·rozteč"),
+ ("M4", "Stroj", "Rozteč kanálů: fixní 9 mm; Equalizer rozsah", "fixní 9; Equalizer dle listu 8 (9–14,2 / 4,5–14,2), G-kód na separátním servu", "mm", "list 8", "mapování formátů 9 ↔ 14,2 mm ↔ 4,5 mm"),
+ ("M5", "Stroj", "Délka špičky ClipTip 12,5 / 300 / 1250 (a délka kužele pipety)", "30–120 mm dle pipety – přesně ČEKÁ", "mm", "zákazník", "kolizní kontrola přečnívajících kanálů"),
+ ("M6", "Stroj", "Max zdvih = délka špičky + 25 mm", "ČEKÁ: co přesně? (max. povýšení racku nad deskou / max. zdvih Z osy od pracovní hladiny)", "mm", "zákazník", "horní mez výšky racků špiček"),
+ ("M7", "Stroj", "Bezpečná Z pro přejezdy mezi pozicemi", "ČEKÁ (config)", "mm", "config", "legalita přejezdu nad vyššími labware"),
+ ("L1", "Labware", "Půdorys L × W včetně holderu/racku (SBS destička 127,76 × 85,48; rack Eppendorf, deepwell, zásobník, boční držáky)", "SBS známo; holdery ČEKÁ", "mm", "katalog výrobce / měření", "mezery, zakrytí kotev"),
+ ("L2", "Labware", "Výška H včetně podstavce / chlazení / magnetické desky", "ČEKÁ", "mm", "měření", "kolize s přečnívajícími kanály"),
+ ("L3", "Labware", "Poloha jamky A1 vůči středu labware a rozteč jamek", "SBS 9 mm standard; holdery ČEKÁ", "mm", "katalog", "souřadnice všech jamek"),
+ ("L4", "Labware", "Tvar jamky/zkumavky: vnitřní průměr nebo průřez, hloubka, tvar dna", "ČEKÁ (1,5 mL, 2 mL QIAGEN, PCR 200 µL, deepwell, 15/50 mL, vakutejner)", "mm", "katalog", "výška hladiny z objemu → bezkontaktní/kontaktní dávkování, ponor"),
+ ("L5", "Labware", "Max a mrtvý objem na jamku", "předvyplněno v listu 3 – potvrdit", "µL", "list 3", "počet nasátí, plnění zdrojů"),
+ ("L6", "Labware", "Tip rack: rozteč špiček, výška špiček nad rackem, výška podstavce h_rack na každý rack", "rozteč 9; ostatní ČEKÁ; h_rack = výstup optimalizace", "mm", "měření", "odběr jednotlivých špiček, kolize"),
+ ("L7", "Labware", "Úzká řada: hloubka (≤ 2 řady), počet zkumavek v řadě (8 po 9 mm?), výška", "ČEKÁ", "mm", "měření", "dosah všemi 8 kanály, nasátí z 8 primerů najednou"),
+ ("L8", "Labware", "Boční držáky: průměr a výška zkumavek (15/50 mL, vakutejner, Eppendorf), rozteč", "ČEKÁ", "mm", "měření", "krajní kanál, hloubka ponoru"),
+ ("T1", "Špičky", "Min / max objem pipety a špičky", "0,5–12,5 / 10–300 / 15–1250 µL (list 8)", "µL", "list 8", "volba pipety pro běh, multi-dispense počet dávek"),
+ ("T2", "Špičky", "Průměr ústí špičky (ponor do jamky) a rozteč 9 mm vs 4,5 mm formát", "ČEKÁ", "mm", "katalog ClipTip", "kontakt s kapalinou / stěnou, 384 destičky"),
+]
+sheet("12_Rozmery", ["ID", "Skupina", "Rozměr / veličina", "Stav / hodnota", "Jednotka", "Zdroj", "K čemu se použije ve výpočtu"],
+      dims, [6, 10, 66, 60, 10, 18, 56], fill_cols=(4,), assume_cols=(3,))
 
 # ---------------------------------------------------------------- 8 Pipettes (from the customer's list)
 rows = []
@@ -271,7 +306,7 @@ if SRC:
 ws = sheet("8_Pipety", ["Katalog. č.", "Typ", "Rozsah", "Kanálů", "Kompatibilní špičky", "Rozteč / min mm", "Rozteč max mm", "Na robotu? (ano/ne)"],
            rows, [14, 28, 16, 8, 20, 14, 14, 18], fill_cols=(8,), assume_cols=(8,), validations={"H": ["ano", "ano (předpoklad)", "ne"]})
 
-wb.move_sheet("8_Pipety", offset=-3)
+wb.move_sheet("8_Pipety", offset=-4)
 out = "docs/labot_zadani_parametry.xlsx"
 wb.save(out)
 print(out, len(rows), "pipettes")
